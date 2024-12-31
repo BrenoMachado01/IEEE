@@ -1,0 +1,45 @@
+import network
+import urequests
+import time
+from machine import ADC, Pin
+
+SSID = 'SUA_REDE_WIFI'
+PASSWORD = 'SENHA_WIFI'
+OPENHAB_IP = '192.168.1.100'
+OPENHAB_PORT = '8080'
+PH_ITEM = 'ph_value'
+CE_ITEM = 'ce_value'
+TEMP_ITEM = 'water_temp'
+
+sensor_ph = ADC(Pin(34))
+sensor_ce = ADC(Pin(35))
+sensor_temp = ADC(Pin(32))
+sensor_ph.atten(ADC.ATTN_11DB)
+sensor_ce.atten(ADC.ATTN_11DB)
+sensor_temp.atten(ADC.ATTN_11DB)
+
+wlan = network.WLAN(network.STA_IF)
+wlan.active(True)
+wlan.connect(SSID, PASSWORD)
+
+while not wlan.isconnected():
+    time.sleep(1)
+
+def ler_sensores():
+    ph = (sensor_ph.read() / 4095) * 14
+    ce = (sensor_ce.read() / 4095) * 2000
+    temp = (sensor_temp.read() / 4095) * 50
+    return ph, ce, temp
+
+def enviar_dados(ph, ce, temp):
+    ph_url = f"http://{OPENHAB_IP}:{OPENHAB_PORT}/rest/items/{PH_ITEM}/state"
+    ce_url = f"http://{OPENHAB_IP}:{OPENHAB_PORT}/rest/items/{CE_ITEM}/state"
+    temp_url = f"http://{OPENHAB_IP}:{OPENHAB_PORT}/rest/items/{TEMP_ITEM}/state"
+    urequests.put(ph_url, data=str(ph), headers={'Content-Type': 'text/plain'})
+    urequests.put(ce_url, data=str(ce), headers={'Content-Type': 'text/plain'})
+    urequests.put(temp_url, data=str(temp), headers={'Content-Type': 'text/plain'})
+
+while True:
+    ph, ce, temp = ler_sensores()
+    enviar_dados(ph, ce, temp)
+    time.sleep(15)
